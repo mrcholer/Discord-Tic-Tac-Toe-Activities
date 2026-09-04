@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root {
+  --ludicord-safe-top: var(--sait, env(safe-area-inset-top, 0px));
+  --ludicord-safe-bottom: var(--saib, env(safe-area-inset-bottom, 0px));
+  --ludicord-safe-left: var(--sail, env(safe-area-inset-left, 0px));
+  --ludicord-safe-right: var(--sair, env(safe-area-inset-right, 0px));
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+}
