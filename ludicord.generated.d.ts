@@ -3,14 +3,24 @@ import "ludicord/navigation";
 
 declare module "ludicord/navigation" {
   interface LudicordRouteRegistry {
-    readonly embed: "home" | "me" | "xo";
-    readonly embedPattern: "home" | "me" | "xo";
+    readonly embed: "hide" | "hockey" | "home" | "me" | "xo";
+    readonly embedPattern: "hide" | "hockey" | "home" | "me" | "xo";
     readonly api: never;
     readonly websocket: "/ws/hide" | "/ws/hockey" | "/ws/xo";
     readonly embedParams: {
+      readonly "hide": Readonly<Record<string, never>>;
+      readonly "hockey": Readonly<Record<string, never>>;
       readonly "home": Readonly<Record<string, never>>;
       readonly "me": Readonly<Record<string, never>>;
       readonly "xo": Readonly<Record<string, never>>;
+    };
+    readonly apiParams: {
+
+    };
+    readonly websocketParams: {
+      readonly "/ws/hide": Readonly<Record<string, never>>;
+      readonly "/ws/hockey": Readonly<Record<string, never>>;
+      readonly "/ws/xo": Readonly<Record<string, never>>;
     };
     readonly config: {
       readonly defaultEmbed: "home";

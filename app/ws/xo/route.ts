@@ -75,7 +75,7 @@ export default defineWS({
             const game = gameFor(instanceId);
             const mark = markFor(game, client.ludicord.user.id);
             const index = typeof data === "object" && data !== null && "index" in data && typeof data.index === "number" ? data.index : -1;
-            if (mark !== game.turn || game.status !== "playing" || index < 0 || index > 8 || game.board[index] !== null) return;
+            if (mark !== game.turn || game.status !== "playing" || !Number.isInteger(index) || index < 0 || index > 8 || game.board[index] !== null) return;
             game.board[index] = mark;
             game.winner = result(game);
             game.status = game.winner ? "won" : game.board.every(Boolean) ? "draw" : "playing";
@@ -103,6 +103,7 @@ export default defineWS({
         reset(client) {
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
             const game = gameFor(instanceId);
+            if (!game.players.some((player) => player.id === client.ludicord.user.id)) return;
             game.board.fill(null);
             game.turn = "X";
             game.winner = null;
@@ -119,7 +120,9 @@ export default defineWS({
         activityConnections?.delete(client.id);
         const userId = client.ludicord.user.id;
         const stillConnected = [...(activityConnections?.values() ?? [])].includes(userId);
-        if (!stillConnected) {
+        if (activityConnections?.size === 0) { connections.delete(instanceId); games.delete(instanceId); return; }
+        const wasPlayer = game.players.some((player) => player.id === userId);
+        if (!stillConnected && wasPlayer) {
             game.players = game.players.filter((player) => player.id !== userId);
             game.readyForNext = game.readyForNext.filter((id) => id !== userId);
             game.status = "waiting";

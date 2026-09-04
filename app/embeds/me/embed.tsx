@@ -3,7 +3,7 @@ import { formatUserName } from "../../../lib/format-user";
 
 const chalkFont = "'Segoe Print','Bradley Hand','Comic Sans MS',cursive";
 
-export default function MeEmbed() {
+export default function embed() {
   const user = useDiscordUser();
 
   return (

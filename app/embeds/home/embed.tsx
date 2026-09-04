@@ -7,7 +7,7 @@ import {
 
 const chalkFont = "'Segoe Print','Bradley Hand','Comic Sans MS',cursive";
 
-export default function HomeEmbed() {
+export default function embed() {
   const user = useDiscordUser();
   const activity = useActivityInstance();
   const participants = useParticipants();

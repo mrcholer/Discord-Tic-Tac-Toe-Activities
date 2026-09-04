@@ -6,7 +6,7 @@ type GameStatus = "waiting" | "playing" | "finished";
 
 interface Player { readonly id: string; readonly name: string; readonly mark: Mark }
 interface ShotResult { readonly shooter: Mark; readonly aim: Zone; readonly dive: Zone; readonly scored: boolean }
-interface Game {
+export interface Game {
     players: Player[];
     score: Record<Mark, number>;
     shooter: Mark;
@@ -24,7 +24,7 @@ const ROUNDS = 3; // each player takes 3 shots in regulation
 const REGULATION_SHOTS = ROUNDS * 2;
 
 const games = new Map<string, Game>();
-const connections = new Map<string, Map<string, Mark>>();
+const connections = new Map<string, Map<string, string>>();
 const pendingShots = new Map<string, Pending>();
 
 function freshGame(): Game {
@@ -69,7 +69,7 @@ function resolveShot(game: Game, pending: Pending) {
     game.lastResult = { shooter: game.shooter, aim: pending.aim, dive: pending.dive, scored };
     game.shotsTaken += 1;
 
-    if (game.shotsTaken >= REGULATION_SHOTS && game.score.A !== game.score.B) {
+    if (game.shotsTaken >= REGULATION_SHOTS && game.shotsTaken % 2 === 0 && game.score.A !== game.score.B) {
         game.status = "finished";
         game.winner = game.score.A > game.score.B ? "A" : "B";
     } else {
@@ -86,23 +86,23 @@ export default defineWS({
     connect(client) {
         const instanceId = client.ludicord.instanceId ?? "browser-preview";
         const game = gameFor(instanceId);
-        const activityConnections = connections.get(instanceId) ?? new Map<string, Mark>();
+        const activityConnections = connections.get(instanceId) ?? new Map<string, string>();
         const existingPlayer = game.players.find((player) => player.id === client.ludicord.user.id);
-        if (existingPlayer) activityConnections.set(client.id, existingPlayer.mark);
+        activityConnections.set(client.id, client.ludicord.user.id);
         connections.set(instanceId, activityConnections);
         client.activity.join();
-        client.emit("state", { ...game, yourMark: activityConnections.get(client.id) ?? null });
+        client.emit("state", { ...game, yourMark: existingPlayer?.mark ?? null });
         client.activity.broadcast("state", game, { includeSelf: false });
     },
     events: {
         join(client, data) {
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
             const game = gameFor(instanceId);
-            const activityConnections = connections.get(instanceId) ?? new Map<string, Mark>();
+            const activityConnections = connections.get(instanceId) ?? new Map<string, string>();
             const requestedMark = typeof data === "object" && data !== null && "mark" in data && (data.mark === "A" || data.mark === "B") ? data.mark : null;
-            if (activityConnections.has(client.id) || requestedMark === null || game.players.length >= 2 || game.players.some((player) => player.id === client.ludicord.user.id || player.mark === requestedMark)) return;
+            if (requestedMark === null || game.players.length >= 2 || game.players.some((player) => player.id === client.ludicord.user.id || player.mark === requestedMark)) return;
             game.players.push({ id: client.ludicord.user.id, name: client.ludicord.user.displayName, mark: requestedMark });
-            activityConnections.set(client.id, requestedMark);
+            activityConnections.set(client.id, client.ludicord.user.id);
             connections.set(instanceId, activityConnections);
             if (game.players.length === 2) game.status = "playing";
             client.emit("state", { ...game, yourMark: requestedMark });
@@ -112,9 +112,9 @@ export default defineWS({
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
             const game = gameFor(instanceId);
             const pending = pendingFor(instanceId);
-            const mark = connections.get(instanceId)?.get(client.id);
+            const mark = game.players.find((player) => player.id === client.ludicord.user.id)?.mark;
             const zone = typeof data === "object" && data !== null && "zone" in data && typeof data.zone === "number" ? data.zone : -1;
-            if (mark !== game.shooter || game.status !== "playing" || zone < 0 || zone > 5 || game.aimReady) return;
+            if (mark !== game.shooter || game.status !== "playing" || !Number.isInteger(zone) || zone < 0 || zone > 5 || game.aimReady) return;
             pending.aim = zone as Zone;
             game.aimReady = true;
             resolveShot(game, pending);
@@ -124,9 +124,9 @@ export default defineWS({
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
             const game = gameFor(instanceId);
             const pending = pendingFor(instanceId);
-            const mark = connections.get(instanceId)?.get(client.id);
+            const mark = game.players.find((player) => player.id === client.ludicord.user.id)?.mark;
             const zone = typeof data === "object" && data !== null && "zone" in data && typeof data.zone === "number" ? data.zone : -1;
-            if (mark !== game.keeper || game.status !== "playing" || zone < 0 || zone > 5 || game.diveReady) return;
+            if (mark !== game.keeper || game.status !== "playing" || !Number.isInteger(zone) || zone < 0 || zone > 5 || game.diveReady) return;
             pending.dive = zone as Zone;
             game.diveReady = true;
             resolveShot(game, pending);
@@ -135,6 +135,7 @@ export default defineWS({
         reset(client) {
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
             const existing = gameFor(instanceId);
+            if (!existing.players.some((player) => player.id === client.ludicord.user.id)) return;
             const fresh = freshGame();
             fresh.players = existing.players;
             fresh.status = existing.players.length === 2 ? "playing" : "waiting";
@@ -148,11 +149,12 @@ export default defineWS({
         const game = games.get(instanceId);
         if (!game) return;
         connections.get(instanceId)?.delete(client.id);
-        const stillConnected = [...(connections.get(instanceId)?.keys() ?? [])].some((connectionId) => {
-            return game.players.some((player) => player.id === client.ludicord.user.id && connections.get(instanceId)?.get(connectionId) === player.mark);
-        });
-        if (!stillConnected) game.players = game.players.filter((player) => player.id !== client.ludicord.user.id);
+        if (connections.get(instanceId)?.size === 0) { connections.delete(instanceId); games.delete(instanceId); pendingShots.delete(instanceId); return; }
+        const stillConnected = [...(connections.get(instanceId)?.values() ?? [])].includes(client.ludicord.user.id);
+        if (stillConnected || !game.players.some((player) => player.id === client.ludicord.user.id)) return;
+        game.players = game.players.filter((player) => player.id !== client.ludicord.user.id);
         game.status = "waiting";
+        game.score = { A: 0, B: 0 }; game.shotsTaken = 0; game.shooter = "A"; game.keeper = "B"; game.winner = null;
         game.aimReady = false;
         game.diveReady = false;
         game.lastResult = null;

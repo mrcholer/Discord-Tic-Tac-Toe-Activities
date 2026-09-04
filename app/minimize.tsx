@@ -5,9 +5,9 @@ import { useDiscord, useDiscordChannel, useDiscordUser } from "ludicord/discord"
 const chalkFont = "'Segoe Print','Bradley Hand','Comic Sans MS',cursive";
 
 export default function MinimizeCard({
-    heading = "Ludicord Activity",
+    heading = "Tic-Tac-Toe Activity",
     message = "Choose Game to challenge another player in Tic-Tac-Toe.",
-    author = "Ludicord",
+    author = "Tic-Tac-Toe",
     channelName = "this channel",
     timestamp = "Now",
     avatar,

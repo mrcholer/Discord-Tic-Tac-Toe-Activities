@@ -1,40 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEmbedPath, useEmbedRouter } from "ludicord/navigation";
 import { useDiscordUser } from "ludicord/discord";
 
 const chalkFont = "'Segoe Print','Bradley Hand','Comic Sans MS',cursive";
 
 const links = [
-  { hash: "#/", label: "Home" },
-  { hash: "#/xo", label: "XO Arena" },
-  { hash: "#/me", label: "Me" },
-];
+  { route: "home", label: "Home" },
+  { route: "xo", label: "XO Arena" },
+  { route: "me", label: "Me" },
+] as const;
 
 export default function Navbar() {
   const user = useDiscordUser();
-  const [hash, setHash] = useState(() => window.location.hash || "#/");
-
-  useEffect(() => {
-    const onChange = () => setHash(window.location.hash || "#/");
-    window.addEventListener("hashchange", onChange);
-    return () => window.removeEventListener("hashchange", onChange);
-  }, []);
-
-  function go(target: string) {
-    window.location.hash = target;
-  }
+  const currentPath = useEmbedPath();
+  const router = useEmbedRouter();
 
   return (
     <nav
       aria-label="Main navigation"
-      className="relative flex items-center gap-1 border-b-[6px] border-[#4a2e1a] bg-gradient-to-b from-[#1a352c] to-[#12251f] px-4 py-3 pl-[calc(1rem+var(--ludicord-safe-left))] pr-[calc(1rem+var(--ludicord-safe-right))]"
+      className="relative flex flex-wrap items-center gap-1 border-b-[6px] border-[#4a2e1a] bg-gradient-to-b from-[#1a352c] to-[#12251f] px-4 py-3 pl-[calc(1rem+var(--ludicord-safe-left))] pr-[calc(1rem+var(--ludicord-safe-right))]"
     >
       {links.map((link) => {
-        const active = hash === link.hash;
+        const active = currentPath === link.route;
         return (
           <button
             className="relative rounded-sm px-3 py-2 text-sm text-[#F1ECDD]/80 transition hover:text-[#F1ECDD] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F1ECDD]/60"
-            key={link.hash}
-            onClick={() => go(link.hash)}
+            key={link.route}
+            onClick={() => router.push(link.route)}
             style={{ fontFamily: chalkFont, fontSize: "1.05rem" }}
             type="button"
           >

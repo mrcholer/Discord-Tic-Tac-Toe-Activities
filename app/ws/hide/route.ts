@@ -5,7 +5,7 @@ type Result = "hidersWin" | "seekerWins";
 
 interface Player { readonly id: string; readonly name: string }
 interface SearchResult { readonly spotId: string; readonly hit: boolean; readonly foundNames: string[] }
-interface Game {
+export interface Game {
     players: Player[];
     seekerId: string | null;
     hiddenPlayerIds: string[];
@@ -23,6 +23,9 @@ interface PrivateState {
 
 const MAX_HEARTS = 3;
 const HIDING_MS = 15000;
+export const SPOTS = ["tree", "crate", "barrel", "bench", "bush", "fountain", "wall", "rock"];
+const timers = new Map<string, ReturnType<typeof setTimeout>>();
+function cancelTimer(instanceId: string) { clearTimeout(timers.get(instanceId)); timers.delete(instanceId); }
 
 const games = new Map<string, Game>();
 const connections = new Map<string, Map<string, string>>(); // instanceId -> clientId -> userId
@@ -74,7 +77,7 @@ export default defineWS({
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
             const game = gameFor(instanceId);
             const userId = client.ludicord.user.id;
-            if (game.phase === "seeking" || game.players.some((player) => player.id === userId)) return;
+            if ((game.phase !== "lobby" && game.phase !== "finished") || game.players.some((player) => player.id === userId)) return;
             game.players.push({ id: userId, name: client.ludicord.user.displayName });
             client.activity.broadcast("state", game, { includeSelf: true });
         },
@@ -82,6 +85,8 @@ export default defineWS({
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
             const game = gameFor(instanceId);
             if ((game.phase !== "lobby" && game.phase !== "finished") || game.players.length < 2) return;
+            if (!game.players.some((player) => player.id === client.ludicord.user.id)) return;
+            cancelTimer(instanceId);
 
             const priv = privateFor(instanceId);
             priv.spots.clear();
@@ -101,13 +106,21 @@ export default defineWS({
             game.hidingEndsAt = Date.now() + HIDING_MS;
             client.activity.broadcast("state", game, { includeSelf: true });
 
-            setTimeout(() => {
+            timers.set(instanceId, setTimeout(() => {
                 const current = games.get(instanceId);
-                if (!current || current.phase !== "hiding") return;
+                timers.delete(instanceId);
+                if (current !== game || current.phase !== "hiding") return;
+                for (const player of current.players) {
+                    if (player.id === current.seekerId || current.hiddenPlayerIds.includes(player.id)) continue;
+                    const spot = SPOTS[Math.floor(Math.random() * SPOTS.length)] as string;
+                    const occupants = priv.spots.get(spot) ?? new Set<string>();
+                    occupants.add(player.id); priv.spots.set(spot, occupants); priv.spotOf.set(player.id, spot);
+                    current.hiddenPlayerIds.push(player.id);
+                }
                 current.phase = "seeking";
                 current.hidingEndsAt = null;
                 client.activity.broadcast("state", current, { includeSelf: true });
-            }, HIDING_MS);
+            }, HIDING_MS));
         },
         hide(client, data) {
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
@@ -115,7 +128,7 @@ export default defineWS({
             const priv = privateFor(instanceId);
             const userId = client.ludicord.user.id;
             const spotId = typeof data === "object" && data !== null && "spotId" in data && typeof data.spotId === "string" ? data.spotId : null;
-            if (game.phase !== "hiding" || spotId === null || userId === game.seekerId || !game.players.some((player) => player.id === userId)) return;
+            if (game.phase !== "hiding" || spotId === null || !SPOTS.includes(spotId) || userId === game.seekerId || !game.players.some((player) => player.id === userId)) return;
 
             const previousSpot = priv.spotOf.get(userId);
             if (previousSpot) priv.spots.get(previousSpot)?.delete(userId);
@@ -133,7 +146,7 @@ export default defineWS({
             const userId = client.ludicord.user.id;
             const x = typeof data === "object" && data !== null && "x" in data && typeof data.x === "number" ? data.x : null;
             const y = typeof data === "object" && data !== null && "y" in data && typeof data.y === "number" ? data.y : null;
-            if (game.phase !== "seeking" || userId !== game.seekerId || x === null || y === null) return;
+            if (game.phase !== "seeking" || userId !== game.seekerId || x === null || y === null || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1) return;
             client.activity.broadcast("beam", { x, y }, { includeSelf: false });
         },
         search(client, data) {
@@ -142,7 +155,7 @@ export default defineWS({
             const priv = privateFor(instanceId);
             const userId = client.ludicord.user.id;
             const spotId = typeof data === "object" && data !== null && "spotId" in data && typeof data.spotId === "string" ? data.spotId : null;
-            if (game.phase !== "seeking" || userId !== game.seekerId || spotId === null) return;
+            if (game.phase !== "seeking" || userId !== game.seekerId || spotId === null || !SPOTS.includes(spotId)) return;
 
             const occupants = priv.spots.get(spotId);
             const hit = !!occupants && occupants.size > 0;
@@ -175,6 +188,8 @@ export default defineWS({
         reset(client) {
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
             const existing = gameFor(instanceId);
+            if (!existing.players.some((player) => player.id === client.ludicord.user.id)) return;
+            cancelTimer(instanceId);
             const fresh = freshGame();
             fresh.players = existing.players;
             games.set(instanceId, fresh);
@@ -189,6 +204,7 @@ export default defineWS({
 
         const activityConnections = connections.get(instanceId);
         activityConnections?.delete(client.id);
+        if (activityConnections?.size === 0) { cancelTimer(instanceId); games.delete(instanceId); connections.delete(instanceId); privateStates.delete(instanceId); return; }
         const userId = client.ludicord.user.id;
         const stillConnected = [...(activityConnections?.values() ?? [])].includes(userId);
         if (stillConnected) return;
@@ -201,12 +217,15 @@ export default defineWS({
         if (game.phase === "lobby" || game.phase === "finished") {
             game.players = game.players.filter((player) => player.id !== userId);
         } else if (userId === game.seekerId) {
+            cancelTimer(instanceId);
             game.phase = "finished";
             game.result = "hidersWin";
+            game.players = game.players.filter((player) => player.id !== userId);
         } else {
             game.hiddenPlayerIds = game.hiddenPlayerIds.filter((id) => id !== userId);
             game.foundPlayerIds = game.foundPlayerIds.filter((id) => id !== userId);
             game.players = game.players.filter((player) => player.id !== userId);
+            if (game.phase === "seeking" && game.hiddenPlayerIds.every((id) => game.foundPlayerIds.includes(id))) { game.phase = "finished"; game.result = "seekerWins"; }
         }
         client.activity.broadcast("state", game, { includeSelf: false });
     },

@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "ludicord dev",
     "build": "ludicord build",
-    "start": "ludicord start"
+    "start": "ludicord start",
+    "typecheck": "tsc --noEmit",
+    "doctor": "ludicord doctor",
+    "routes": "ludicord routes"
   },
   "dependencies": {
-    "ludicord": "^2.2.1",
+    "ludicord": "^2.2.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "tailwindcss": "^4.1.13",
