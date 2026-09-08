@@ -6,6 +6,7 @@ const chalkFont = "'Segoe Print','Bradley Hand','Comic Sans MS',cursive";
 const links = [
   { route: "home", label: "Home" },
   { route: "xo", label: "XO Arena" },
+  { route: "shop", label: "Sound Shop" },
   { route: "me", label: "Me" },
 ] as const;
 

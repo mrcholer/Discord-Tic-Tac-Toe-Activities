@@ -3,29 +3,34 @@ import "ludicord/navigation";
 
 declare module "ludicord/navigation" {
   interface LudicordRouteRegistry {
-    readonly embed: "hide" | "hockey" | "home" | "me" | "xo";
-    readonly embedPattern: "hide" | "hockey" | "home" | "me" | "xo";
-    readonly api: never;
-    readonly websocket: "/ws/hide" | "/ws/hockey" | "/ws/xo";
+    readonly embed: "home" | "me" | "shop" | "xo";
+    readonly embedPattern: "home" | "me" | "shop" | "xo";
+    readonly api: "/api/shop/buy" | "/api/shop/detail" | "/api/shop/me" | "/api/shop/recent" | "/api/shop/search" | "/api/shop/select" | "/api/shop/trending";
+    readonly websocket: "/ws/xo";
     readonly embedParams: {
-      readonly "hide": Readonly<Record<string, never>>;
-      readonly "hockey": Readonly<Record<string, never>>;
       readonly "home": Readonly<Record<string, never>>;
       readonly "me": Readonly<Record<string, never>>;
+      readonly "shop": Readonly<Record<string, never>>;
       readonly "xo": Readonly<Record<string, never>>;
     };
     readonly apiParams: {
-
+      readonly "/api/shop/buy": Readonly<Record<string, never>>;
+      readonly "/api/shop/detail": Readonly<Record<string, never>>;
+      readonly "/api/shop/me": Readonly<Record<string, never>>;
+      readonly "/api/shop/recent": Readonly<Record<string, never>>;
+      readonly "/api/shop/search": Readonly<Record<string, never>>;
+      readonly "/api/shop/select": Readonly<Record<string, never>>;
+      readonly "/api/shop/trending": Readonly<Record<string, never>>;
     };
     readonly websocketParams: {
-      readonly "/ws/hide": Readonly<Record<string, never>>;
-      readonly "/ws/hockey": Readonly<Record<string, never>>;
       readonly "/ws/xo": Readonly<Record<string, never>>;
     };
     readonly config: {
       readonly defaultEmbed: "home";
       readonly outsideDiscord: "allow";
       readonly authRequired: true;
+      readonly strictMode: true;
+      readonly clientAssetWarningLimit: 512000;
     };
   }
 }

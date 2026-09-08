@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useDiscordUser } from "ludicord/discord";
 import { useWS } from "ludicord/ws/client";
+import type { ShopSound } from "../../../lib/shop";
+import { stopSound } from "../../../lib/sound-player";
+import { SoundToast, useSoundToast } from "../../../components/sound-toast";
 
 type Mark = "X" | "O";
 type Cell = Mark | null;
@@ -32,14 +35,27 @@ const cellRotations = [-2, 1, -1, 2, 0, -2, 1, -1, 2];
 export default function embed() {
     const user = useDiscordUser();
     const connection = useWS("/ws/xo");
+    const { toast, play } = useSoundToast();
     const [game, setGame] = useState<GameState>(emptyState);
     const [myMark, setMyMark] = useState<Mark | null>(null);
+    const [winSound, setWinSound] = useState<ShopSound | null>(null);
 
     useEffect(() => connection.on("state", (data) => {
         const next = data as GameState & { readonly yourMark?: Mark | null };
         setGame(next);
         if ("yourMark" in next) setMyMark(next.yourMark ?? null);
     }), [connection]);
+
+    useEffect(() => connection.on("win", (data) => {
+        const payload = data as { readonly winnerId?: string; readonly sound?: ShopSound };
+        const sound = payload?.sound;
+        if (sound?.mp3) {
+            setWinSound(sound);
+            play(sound.mp3, sound.title);
+        }
+    }), [connection, play]);
+
+    useEffect(() => () => stopSound(), []);
 
     const myId = user?.id ?? null;
     const isRoundOver = game.status === "won" || game.status === "draw";
@@ -73,19 +89,8 @@ export default function embed() {
 
     return (
         <main
-            className="relative h-[calc(100vh-61px)] w-full overflow-hidden text-[#F1ECDD]"
-            style={{
-                background:
-                    "radial-gradient(circle at 22% 18%, rgba(241,236,221,0.05), transparent 40%), radial-gradient(circle at 78% 85%, rgba(241,236,221,0.04), transparent 45%), linear-gradient(160deg, #1a352c 0%, #12251f 60%, #0e1d19 100%)",
-            }}
+            className="relative h-full w-full overflow-hidden text-[#F1ECDD]"
         >
-            {/* wooden chalkboard frame */}
-            <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0"
-                style={{ boxShadow: "inset 0 0 0 14px #4a2e1a, inset 0 0 0 18px #6b4226, inset 0 0 46px 20px rgba(0,0,0,0.35)" }}
-            />
-
             <div className="relative flex h-full min-h-0 w-full flex-col gap-4 p-6 sm:flex-row sm:gap-6 sm:p-8">
                 {/* roster ledge */}
                 <aside className="flex w-full shrink-0 flex-row items-stretch gap-3 sm:w-64 sm:flex-col sm:justify-between">
@@ -228,6 +233,20 @@ export default function embed() {
                         </p>
                     )}
 
+                    {isRoundOver && winSound && (
+                        <p className="mt-3 flex items-center gap-2 rounded-sm border border-[#F4C860]/40 px-3 py-1.5 text-sm text-[#F4C860]" style={{ fontFamily: chalkFont }}>
+                            <button
+                                className="grid h-6 w-6 place-items-center rounded-full transition hover:bg-[#F1ECDD]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F4C860]"
+                                onClick={() => play(winSound.mp3, winSound.title)}
+                                style={{ border: "2px solid #F4C860" }}
+                                type="button"
+                            >
+                                ♪
+                            </button>
+                            <span className="max-w-60 truncate">{winSound.title}</span>
+                        </p>
+                    )}
+
                     <div className="mt-4 flex sm:hidden">
                         {isRoundOver ? (
                             <button
@@ -253,6 +272,7 @@ export default function embed() {
                     </div>
                 </section>
             </div>
+            <SoundToast message={toast} />
         </main>
     );
 }

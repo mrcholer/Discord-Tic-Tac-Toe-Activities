@@ -20,17 +20,26 @@ export default defineConfig({
     host: "0.0.0.0",
     allowedHosts: true,
     limits: { body: "2mb" },
+    requestTimeout: 30000,
+    shutdownTimeout: 10000,
   },
   websocket: {
     enabled: true,
     heartbeatInterval: 30000,
     maxPayload: 1048576,
     compression: false,
+    maxMessagesPerSecond: 120,
     reconnect: {
       enabled: true,
       attempts: 10,
       initialDelay: 500,
       maxDelay: 10000,
     },
+  },
+  react: {
+    strictMode: true,
+  },
+  build: {
+    clientAssetWarningLimit: 512000,
   },
 });

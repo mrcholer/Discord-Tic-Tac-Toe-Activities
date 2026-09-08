@@ -18,23 +18,7 @@ export default function embed() {
   }
 
   return (
-    <main className="relative h-[calc(100vh-61px)] w-full overflow-y-auto overflow-x-hidden text-[#F1ECDD]">
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 22% 18%, rgba(241,236,221,0.05), transparent 40%), radial-gradient(circle at 78% 82%, rgba(241,236,221,0.04), transparent 45%), linear-gradient(160deg, #1a352c 0%, #12251f 60%, #0e1d19 100%)",
-          zIndex: -1,
-        }}
-      />
-      {/* wooden chalkboard frame, scoped to this component's own area so it never draws over the navbar above it */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ boxShadow: "inset 0 0 0 14px #4a2e1a, inset 0 0 0 18px #6b4226, inset 0 0 46px 20px rgba(0,0,0,0.35)" }}
-      />
-
+    <main className="no-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden text-[#F1ECDD]">
       <div
         className="relative mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-10"
         style={{ paddingTop: "calc(2rem + var(--ludicord-safe-top))", paddingBottom: "calc(2rem + var(--ludicord-safe-bottom))" }}

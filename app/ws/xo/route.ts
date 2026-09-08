@@ -1,4 +1,6 @@
 import { defineWS } from "ludicord/ws/server";
+import { addPoints, ensureUserRecord, selectedSound } from "../../../lib/user-store";
+import { POINTS_PER_WIN } from "../../../lib/shop";
 
 type Mark = "X" | "O";
 type Cell = Mark | null;
@@ -11,6 +13,8 @@ interface Game {
     status: GameStatus;
     winner: Mark | null;
     readyForNext: string[]; // player ids who've confirmed they want the next round
+    score: Record<string, number>; // userId -> rounds won on this table
+    rounds: number; // completed rounds on this table
 }
 
 const games = new Map<string, Game>();
@@ -20,7 +24,7 @@ const wins = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], 
 function gameFor(instanceId: string): Game {
     const existing = games.get(instanceId);
     if (existing) return existing;
-    const game: Game = { board: Array<Cell>(9).fill(null), players: [], turn: "X", status: "waiting", winner: null, readyForNext: [] };
+    const game: Game = { board: Array<Cell>(9).fill(null), players: [], turn: "X", status: "waiting", winner: null, readyForNext: [], score: {}, rounds: 0 };
     games.set(instanceId, game);
     return game;
 }
@@ -54,6 +58,7 @@ export default defineWS({
         activityConnections.set(client.id, client.ludicord.user.id);
         connections.set(instanceId, activityConnections);
         client.activity.join();
+        void ensureUserRecord(client.ludicord.user.id);
         const yourMark = markFor(game, client.ludicord.user.id);
         client.emit("state", { ...withWatchers(instanceId, game), yourMark });
         client.activity.broadcast("state", withWatchers(instanceId, game), { includeSelf: false });
@@ -70,7 +75,7 @@ export default defineWS({
             client.emit("state", { ...withWatchers(instanceId, game), yourMark: requestedMark });
             client.activity.broadcast("state", withWatchers(instanceId, game), { includeSelf: false });
         },
-        move(client, data) {
+async move(client, data) {
             const instanceId = client.ludicord.instanceId ?? "browser-preview";
             const game = gameFor(instanceId);
             const mark = markFor(game, client.ludicord.user.id);
@@ -80,8 +85,21 @@ export default defineWS({
             game.winner = result(game);
             game.status = game.winner ? "won" : game.board.every(Boolean) ? "draw" : "playing";
             if (!game.winner && game.status === "playing") game.turn = mark === "X" ? "O" : "X";
-            if (game.status === "won" || game.status === "draw") game.readyForNext = [];
+            let lastChampion: Player | undefined;
+            if (game.status === "won" || game.status === "draw") {
+                game.readyForNext = [];
+                game.rounds += 1;
+                if (game.winner) {
+                    const champion = game.players.find((player) => player.mark === game.winner);
+                    if (champion) {
+                        game.score[champion.id] = (game.score[champion.id] ?? 0) + 1;
+                        lastChampion = champion;
+                        await addPoints(champion.id, POINTS_PER_WIN);
+                    }
+                }
+            }
             client.activity.broadcast("state", withWatchers(instanceId, game), { includeSelf: true });
+            if (lastChampion) client.activity.broadcast("win", { winnerId: lastChampion.id, sound: await selectedSound(lastChampion.id) }, { includeSelf: true });
         },
         // Both players confirm before the board clears, instead of either one
         // being able to yank it out from under the other mid-celebration.
