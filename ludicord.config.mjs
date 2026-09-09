@@ -26,7 +26,7 @@ export default defineConfig({
   websocket: {
     enabled: true,
     heartbeatInterval: 30000,
-    maxPayload: 1048576,
+    maxPayload: 262144,
     compression: false,
     maxMessagesPerSecond: 120,
     reconnect: {

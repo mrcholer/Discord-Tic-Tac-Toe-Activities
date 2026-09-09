@@ -7,13 +7,10 @@
     "dev": "ludicord dev",
     "build": "ludicord build",
     "start": "ludicord start",
-    "lint": "ludicord lint",
-    "analyze": "ludicord analyze",
-    "routes": "ludicord routes",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "ludicord": "^3.0.1",
+    "ludicord": "^3.1.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "tailwindcss": "^4.1.13",
