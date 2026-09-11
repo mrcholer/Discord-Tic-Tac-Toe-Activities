@@ -19,6 +19,7 @@ export default defineConfig({
     port: 3000,
     host: "0.0.0.0",
     allowedHosts: true,
+    allowedOrigins: true,
     limits: { body: "2mb" },
     requestTimeout: 30000,
     shutdownTimeout: 10000,
